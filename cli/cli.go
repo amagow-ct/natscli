@@ -16,11 +16,12 @@ package cli
 import (
 	"context"
 	"embed"
-	"github.com/nats-io/natscli/options"
 	glog "log"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/nats-io/natscli/options"
 
 	"github.com/choria-io/fisk"
 )
@@ -56,7 +57,20 @@ var (
 
 	// These are persisted by contexts, as properties thereof.
 	// So don't include NATS_CONTEXT in this list.
-	overrideEnvVars = []string{"NATS_URL", "NATS_USER", "NATS_PASSWORD", "NATS_CREDS", "NATS_NKEY", "NATS_CERT", "NATS_KEY", "NATS_CA", "NATS_TIMEOUT", "NATS_SOCKS_PROXY", "NATS_COLOR"}
+	overrideEnvVars = []string{
+		"NATS_URL",
+		"NATS_USER",
+		"NATS_PASSWORD",
+		"NATS_CREDS",
+		"NATS_NKEY",
+		"NATS_CERT",
+		"NATS_KEY",
+		"NATS_CA",
+		"NATS_TIMEOUT",
+		"NATS_SOCKS_PROXY",
+		"NATS_COLOR",
+		"NATS_TLS_INSECURE",
+	}
 )
 
 func registerCommand(name string, order int, c func(app commandHost)) {
@@ -132,7 +146,12 @@ func commonConfigure(cmd commandHost, cliOpts *options.Options, disable ...strin
 
 // ConfigureInCommand attaches the cli commands to cmd, prepare will load the context on demand and should be true unless override nats,
 // manager and js context is given in a custom PreAction in the caller.  Disable is a list of command names to skip.
-func ConfigureInCommand(cmd *fisk.CmdClause, cliOpts *options.Options, prepare bool, disable ...string) (*options.Options, error) {
+func ConfigureInCommand(
+	cmd *fisk.CmdClause,
+	cliOpts *options.Options,
+	prepare bool,
+	disable ...string,
+) (*options.Options, error) {
 	err := commonConfigure(cmd, cliOpts, disable...)
 	if err != nil {
 		return nil, err
@@ -147,7 +166,12 @@ func ConfigureInCommand(cmd *fisk.CmdClause, cliOpts *options.Options, prepare b
 
 // ConfigureInApp attaches the cli commands to app, prepare will load the context on demand and should be true unless override nats,
 // manager and js context is given in a custom PreAction in the caller.  Disable is a list of command names to skip.
-func ConfigureInApp(app *fisk.Application, cliOpts *options.Options, prepare bool, disable ...string) (*options.Options, error) {
+func ConfigureInApp(
+	app *fisk.Application,
+	cliOpts *options.Options,
+	prepare bool,
+	disable ...string,
+) (*options.Options, error) {
 	err := commonConfigure(app, cliOpts, disable...)
 	if err != nil {
 		return nil, err

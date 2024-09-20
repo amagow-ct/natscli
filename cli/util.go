@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -56,11 +57,14 @@ import (
 	"github.com/nats-io/nuid"
 )
 
-var (
-	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-)
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-func selectConsumer(mgr *jsm.Manager, stream string, consumer string, force bool) (string, *jsm.Consumer, error) {
+func selectConsumer(
+	mgr *jsm.Manager,
+	stream string,
+	consumer string,
+	force bool,
+) (string, *jsm.Consumer, error) {
 	if consumer != "" {
 		c, err := mgr.LoadConsumer(stream, consumer)
 		if err == nil {
@@ -73,7 +77,9 @@ func selectConsumer(mgr *jsm.Manager, stream string, consumer string, force bool
 	}
 
 	if !iu.IsTerminal() {
-		return "", nil, fmt.Errorf("cannot pick a Consumer without a terminal and no Consumer name supplied")
+		return "", nil, fmt.Errorf(
+			"cannot pick a Consumer without a terminal and no Consumer name supplied",
+		)
 	}
 
 	consumers, err := mgr.ConsumerNames(stream)
@@ -104,7 +110,12 @@ func selectConsumer(mgr *jsm.Manager, stream string, consumer string, force bool
 	}
 }
 
-func selectStream(mgr *jsm.Manager, stream string, force bool, all bool) (string, *jsm.Stream, error) {
+func selectStream(
+	mgr *jsm.Manager,
+	stream string,
+	force bool,
+	all bool,
+) (string, *jsm.Stream, error) {
 	s, err := mgr.LoadStream(stream)
 	if err == nil {
 		return s.Name(), s, nil
@@ -134,7 +145,9 @@ func selectStream(mgr *jsm.Manager, stream string, force bool, all bool) (string
 	}
 
 	if !iu.IsTerminal() {
-		return "", nil, fmt.Errorf("cannot pick a Stream without a terminal and no Stream name supplied")
+		return "", nil, fmt.Errorf(
+			"cannot pick a Stream without a terminal and no Stream name supplied",
+		)
 	}
 
 	if force {
@@ -281,6 +294,11 @@ func natsOpts() []nats.Option {
 		connectionName = "NATS CLI Version " + Version
 	}
 
+	tlsConfig := &tls.Config{}
+	if opts().TlsInsecure {
+		tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
 	return append(copts, []nats.Option{
 		nats.Name(connectionName),
 		nats.MaxReconnects(-1),
@@ -291,7 +309,10 @@ func natsOpts() []nats.Option {
 		}),
 		nats.DiscoveredServersHandler(func(conn *nats.Conn) {
 			if opts().Trace {
-				log.Printf(">>> Discovered new servers, known servers are now %s", strings.Join(conn.Servers(), ", "))
+				log.Printf(
+					">>> Discovered new servers, known servers are now %s",
+					strings.Join(conn.Servers(), ", "),
+				)
 			}
 		}),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
@@ -310,6 +331,7 @@ func natsOpts() []nats.Option {
 				log.Printf("Unexpected NATS error from server %s: %s", nc.ConnectedUrlRedacted(), err)
 			}
 		}),
+		nats.Secure(tlsConfig),
 	}...)
 }
 
@@ -592,8 +614,10 @@ func pubReplyBodyTemplate(body string, request string, ctr int) ([]byte, error) 
 	return b.Bytes(), nil
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-var passwordRunes = append(letterRunes, []rune("@#_-%^&()")...)
+var (
+	letterRunes   = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	passwordRunes = append(letterRunes, []rune("@#_-%^&()")...)
+)
 
 func randomPassword(length int) string {
 	b := make([]rune, length)
@@ -764,7 +788,6 @@ func renderCluster(cluster *api.ClusterInfo) string {
 			} else {
 				warn = append(warn, i)
 			}
-
 		}
 		peers = append(peers, name)
 	}
@@ -909,7 +932,9 @@ func doReqAsync(req any, subj string, waitFor int, nc *nats.Conn, cb func([]byte
 	select {
 	case err = <-errs:
 		if err == nats.ErrNoResponders && strings.HasPrefix(subj, "$SYS") {
-			return fmt.Errorf("server request failed, ensure the account used has system privileges and appropriate permissions")
+			return fmt.Errorf(
+				"server request failed, ensure the account used has system privileges and appropriate permissions",
+			)
 		}
 
 		return err
@@ -1094,8 +1119,10 @@ func (pr *progressRW) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-var bytesUnitSplitter = regexp.MustCompile(`^(\d+)(\w+)`)
-var errInvalidByteString = errors.New("bytes must end in K, KB, M, MB, G, GB, T or TB")
+var (
+	bytesUnitSplitter    = regexp.MustCompile(`^(\d+)(\w+)`)
+	errInvalidByteString = errors.New("bytes must end in K, KB, M, MB, G, GB, T or TB")
+)
 
 // nats-server derived string parse, empty string and any negative is -1,
 // others are parsed as 1024 based bytes
@@ -1131,7 +1158,20 @@ func parseStringAsBytes(s string) (int64, error) {
 	}
 
 	suffix := matches[2]
-	suffixMap := map[string]int64{"K": 10, "KB": 10, "KIB": 10, "M": 20, "MB": 20, "MIB": 20, "G": 30, "GB": 30, "GIB": 30, "T": 40, "TB": 40, "TIB": 40}
+	suffixMap := map[string]int64{
+		"K":   10,
+		"KB":  10,
+		"KIB": 10,
+		"M":   20,
+		"MB":  20,
+		"MIB": 20,
+		"G":   30,
+		"GB":  30,
+		"GIB": 30,
+		"T":   40,
+		"TB":  40,
+		"TIB": 40,
+	}
 
 	mult, ok := suffixMap[strings.ToUpper(suffix)]
 	if !ok {
@@ -1142,7 +1182,12 @@ func parseStringAsBytes(s string) (int64, error) {
 	return num, nil
 }
 
-func outPutMSGBodyCompact(data []byte, filter string, subject string, stream string) (string, error) {
+func outPutMSGBodyCompact(
+	data []byte,
+	filter string,
+	subject string,
+	stream string,
+) (string, error) {
 	if len(data) == 0 {
 		fmt.Println("nil body")
 		return "", nil
